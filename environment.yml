@@ -1,4 +1,4 @@
-name: /home/liy110/anaconda3/envs/biocuda
+name: scCotag
 channels:
   - pytorch
   - nvidia
