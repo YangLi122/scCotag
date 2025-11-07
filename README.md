@@ -1,1 +1,6 @@
 # scCotag
+
+Installation:
+```
+
+```
