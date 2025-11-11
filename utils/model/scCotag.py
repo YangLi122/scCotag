@@ -115,11 +115,9 @@ class scCotag(nn.Module):
         # t = max(0, min(epoch, warmup_epochs))
         t = max(0, (epoch - warmup_epochs))
         self.crt_samp_alignment_weight = self.samp_alignment_weight * min(1.0, t / float(warmup_epochs))
-        # self.crt_feat_alignment_weight = self.feat_alignment_weight * min(1.0, t / float(warmup_epochs))
     
     def _distribution_beta(self, epoch: int, warmup_epochs: int | None) -> float:
         t = max(0, (epoch - warmup_epochs))
-        # t = max(0, min(epoch, warmup_epochs))
         self.crt_distribution_alignment_weight = self.distribution_alignment_weight * min(1.0, t / float(warmup_epochs))
     
     def run_ot(self):
@@ -210,29 +208,24 @@ class scCotag(nn.Module):
                 sammon=True,
                 beta=0.7,
                 eps=1e-12):
-                """
-                Returns a scalar loss that preserves each NON-ANCHOR cell's distances to the ANCHOR set,
-                comparing 'before' vs 'target' geometry.
-                """
                 device = Z_before.device
                 idxA = torch.nonzero(anchor_mask, as_tuple=False).squeeze(1)
                 if idxA.numel() == 0:
                     return Z_before.new_tensor(0.0)
             
-                # pairwise distances: non-anchor -> anchors, before & after
-                ZA = Z_before[idxA]                    # (nA, d)
-                TA = Z_target[idxA]                    # (nA, d)
+                ZA = Z_before[idxA]                
+                TA = Z_target[idxA]                 
             
                 # For all non-anchors, compute distances to anchors
                 idxN = torch.nonzero(~anchor_mask, as_tuple=False).squeeze(1)
                 if idxN.numel() == 0:
                     return Z_before.new_tensor(0.0)
             
-                ZN = Z_before[idxN]                    # (nN, d)
-                TN = Z_target[idxN]                    # (nN, d)
+                ZN = Z_before[idxN]           
+                TN = Z_target[idxN]                  
             
-                Db = torch.cdist(ZN, ZA)               # (nN, nA)
-                Da = torch.cdist(TN, TA)               # (nN, nA)
+                Db = torch.cdist(ZN, ZA)           
+                Da = torch.cdist(TN, TA)           
             
                 if scale_invariant:
                     s = ((Db * Da).sum(dim=1) / (Da.pow(2).sum(dim=1) + eps)).unsqueeze(1)  # (nN,1)
@@ -242,7 +235,7 @@ class scCotag(nn.Module):
             
                 if sammon:
                     W = 1.0 / (Db + eps)
-                    err = (W * (Da_s - Db)).pow(2).mean(dim=1)  # per cell
+                    err = (W * (Da_s - Db)).pow(2).mean(dim=1) 
                     med = torch.median(torch.sqrt(err + eps))
                     loss_vec = torch.sqrt(err + eps) / (beta * med + eps)
                 else:
@@ -304,8 +297,6 @@ class scCotag(nn.Module):
         distribution_align_loss_wt = self.crt_distribution_alignment_weight * distribution_align_loss
 
         loss = rna_vae_loss_wt + atac_vae_loss_wt + graph_vae_loss_wt + samp_align_loss_wt + distribution_align_loss_wt
-        
-        
         return {"loss": loss, "rna_vae_loss": rna_vae_loss_wt, "atac_vae_loss": atac_vae_loss_wt, "graph_vae_loss": graph_vae_loss_wt, "samp_align_loss": samp_align_loss_wt, "distribution_align_loss": distribution_align_loss_wt, "rna_kl_loss":  rna_vae_loss['kl_loss'], "rna_recon_loss": rna_vae_loss['reconstruction_loss'], "atac_kl_loss":  atac_vae_loss['kl_loss'], "atac_recon_loss": atac_vae_loss['reconstruction_loss'], "graph_kl_loss": graph_vae_loss['kl_loss'], "graph_recon_loss": graph_vae_loss['reconstruction_loss']}
 
         
