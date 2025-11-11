@@ -48,8 +48,8 @@ def parse_args() -> argparse.Namespace:
         help="Path to input ATAC dataset (.h5ad)"
     )
     parser.add_argument(
-        "--seeds", dest="seeds", type=int, nargs="+", default=[1, 2, 3, 4, 5],
-        help="List of random seeds to run (e.g., --seeds 1 2 3 4 5)"
+        "--seeds", dest="seeds", type=int, nargs="+", default=[1],
+        help="List of random seeds to run (e.g., --seeds 1)"
     )
     parser.add_argument(
         "--train-dir", dest="train_dir", type=pathlib.Path, required=True,
@@ -174,19 +174,14 @@ def run_sccotag(args: argparse.Namespace, seed: int) -> None:
     print("[4/4] Saving results...")
     rna.obsm['scCotag'] = model.encoding_data(modality='rna', use_best = False)
     atac.obsm['scCotag'] = model.encoding_data(modality='atac', use_best = False)
-    out_rna_df=pd.DataFrame(rna.obsm['scCotag'],index=rna.obs.index.values)
-    out_atac_df=pd.DataFrame(atac.obsm['scCotag'],index=atac.obs.index.values)
-    out_rna_df.to_csv(out_rna, header=False)
-    out_atac_df.to_csv(out_atac, header=False)
-
-    # out_rna = add_best_before_seed(out_rna)
-    # out_atac = add_best_before_seed(out_atac)
-    # rna.obsm['scCotag'] = model.encoding_data(modality='rna')
-    # atac.obsm['scCotag'] = model.encoding_data(modality='atac')
+    feat_emb = model.encoding_graph(model.graph)
+    rna.varm['scCotag'] = feat_emb[:model.graph['num_genes']]
+    atac.varm['scCotag'] = feat_emb[model.graph['num_genes']:]
     # out_rna_df=pd.DataFrame(rna.obsm['scCotag'],index=rna.obs.index.values)
     # out_atac_df=pd.DataFrame(atac.obsm['scCotag'],index=atac.obs.index.values)
-    # out_rna_df.to_csv(out_rna, header=False)
-    # out_atac_df.to_csv(out_atac, header=False)
+    rna.write_h5ad(out_rna)
+    atac.write_h5ad(out_atac)
+
     
 
 
