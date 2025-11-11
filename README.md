@@ -1,4 +1,5 @@
 # scCotag
+scCotag: Diagonal integration of single-cell multi-omics data via prior-informed Co-optimal transport and regularized barycentric mapping
 
 Installation:
 ```
