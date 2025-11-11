@@ -474,11 +474,6 @@ def alignability_estimation(rna, atac):
     
     z = (scores - med) / (robust_scale + 1e-10)       
     conf_score = torch.sigmoid(-z / 1)
-    shared_cells = list(set(rna.obs.index.values).intersection(set(atac.obs.index.values)))
-    unique_cells = set(atac.obs.index.values).difference(set(rna.obs.index.values))
-    alignable_index = atac.obs_names.get_indexer(shared_cells)
-    unalignable_index = atac.obs_names.get_indexer(unique_cells)
-    print(f"P Value in Distinguishing the alignalibility: {ks_2samp(conf_score[alignable_index], conf_score[unalignable_index])[1]}...")
     return conf_score
     
 
