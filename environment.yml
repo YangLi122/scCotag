@@ -225,36 +225,6 @@ dependencies:
   - zlib=1.3.1=hb9d3cd8_2
   - zstd=1.5.7=hb8e6e7a_2
   - pip:
-      - charset-normalizer==3.4.2
-      - et-xmlfile==2.0.0
-      - filelock==3.18.0+computecanada
-      - frozenlist==1.6.0
-      - fsspec==2025.5.1+computecanada
-      - geomloss==0.2.6+computecanada
-      - idna==3.10+computecanada
-      - igraph==0.11.9
-      - jinja2==3.1.6+computecanada
-      - keopscore==2.3
-      - markupsafe==2.1.5+computecanada
-      - mpmath==1.3.0+computecanada
-      - multidict==6.4.4
-      - networkx==3.5
-      - numpy==2.2.2+computecanada
-      - openpyxl==3.1.5
-      - pillow-simd==9.5.0.post2+computecanada
-      - propcache==0.3.1+computecanada
-      - psutil==6.1.1+computecanada
-      - pybind11==3.0.1
-      - pykeops==2.3
-      - requests==2.32.3+computecanada
-      - sympy==1.13.1+computecanada
-      - texttable==1.7.0
-      - torch==2.6.0+computecanada
-      - torch-geometric==2.6.1+computecanada
-      - torchaudio==2.6.0+computecanada
-      - torchvision==0.21.0+computecanada
-      - tqdm==4.67.1+computecanada
-      - typing-extensions==4.13.2+computecanada
-      - urllib3==2.4.0+computecanada
-      - yarl==1.20.0
+      - geomloss==0.2.6
+      - torch-geometric==2.6.1
 prefix: /home/liy110/anaconda3/envs/biocuda
