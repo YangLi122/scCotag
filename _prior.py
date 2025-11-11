@@ -15,7 +15,8 @@ import scipy.sparse
 def create_feat_prior(
     adata_rna: AnnData,
     adata_atac: AnnData,
-    window_size: int = 1e5
+    window_size: int = 1e5,
+    return_dist = False, 
 ) -> pd.DataFrame:
 
     hvg_df = adata_rna.var[adata_rna.var['highly_variable']].copy()
@@ -46,6 +47,7 @@ def create_feat_prior(
         print("No peaks found within any gene windows. Returning an empty DataFrame.")
         return pd.DataFrame(index=hvg_gene_names)
     print(f"Found {len(overlapping_join)} total gene-peak links.")
+    overlap_df = overlapping_join.df
     linkage_matrix = pd.crosstab(
         overlapping_join.df['gene_name'],
         overlapping_join.df['Name']
@@ -64,6 +66,60 @@ def create_feat_prior(
     final_matrix = final_matrix.loc[sorted_gname, sorted_cname]
 
     print(f"\n✅ Function complete. Matrix shape: {final_matrix.shape}")
+
+    if return_dist:
+        gene_pos = hvg_df.set_index('gene_name')[['chromStart', 'chromEnd']]
+    
+        # pull arrays
+        gene_names_arr = overlap_df['gene_name'].values
+        peak_names_arr = overlap_df['Name'].values
+    
+        # get original gene starts/ends aligned to overlap rows
+        gene_starts = gene_pos.loc[gene_names_arr, 'chromStart'].to_numpy()
+        gene_ends   = gene_pos.loc[gene_names_arr, 'chromEnd'].to_numpy()
+    
+        # peak intervals from join (these are the real peak coords)
+        p_start = overlap_df['Start_b'].to_numpy()
+        p_end   = overlap_df['End_b'].to_numpy()
+    
+        # distance between peak interval and ORIGINAL gene body [gene_starts, gene_ends]
+        # if they overlap: 0
+        distance = np.where(
+            p_end < gene_starts,             # peak completely before gene
+            gene_starts - p_end,
+            np.where(
+                gene_ends < p_start,         # peak completely after gene
+                p_start - gene_ends,
+                0
+            )
+        )
+    
+        dist_df = pd.DataFrame({
+            'gene_name': gene_names_arr,
+            'peak': peak_names_arr,
+            'distance': distance.astype(int)
+        })
+    
+        # dedupe: one (gene, peak) → smallest distance
+        dist_df = (
+            dist_df
+            .groupby(['gene_name', 'peak'], as_index=False)['distance']
+            .min()
+        )
+    
+        # 7) keep only pairs that actually survived in final_matrix
+        fm_nonzero = final_matrix.stack()
+        fm_nonzero = fm_nonzero[fm_nonzero != 0].reset_index()
+        fm_nonzero.columns = ['gene_name', 'peak', 'value']
+    
+        dist_nonzero_df = fm_nonzero.merge(
+            dist_df,
+            on=['gene_name', 'peak'],
+            how='left'
+        ).drop(columns=['value'])
+    
+        dist_nonzero_df['distance'] = dist_nonzero_df['distance'].fillna(0).astype(int)
+        return final_matrix, dist_nonzero_df
     return final_matrix
 
 def create_samp_prior(rna, atac, imbalance:bool=False, reg = 0.05, reg_m = 1):
@@ -92,9 +148,3 @@ def create_samp_prior(rna, atac, imbalance:bool=False, reg = 0.05, reg_m = 1):
     else:
         pi_samp = ot.sinkhorn(p, q, dist, reg=reg)    
     return pi_samp
-
-
-
-
-
-
