@@ -16,6 +16,6 @@ https://drive.google.com/file/d/1MxpLn7E9Tw8dWgse08y2j1VpPetSuHm7/view?usp=shari
 To run the model:
 ```
 micromamba activate sccoatg
-python Run_scCotag.py --input-rna 10x-Multiome-Pbmc-Subsampled_100perCT-RNA.h5ad --input-atac 10x-Multiome-Pbmc-Subsampled_100perCT-ATAC.h5ad --output-rna rna_emb_out.csv --output-atac atac_emb_out.csv --train-dir ./
+python Run_scCotag.py --input-rna 10x-Multiome-Pbmc-Subsampled_100perCT-RNA.h5ad --input-atac 10x-Multiome-Pbmc-Subsampled_100perCT-ATAC.h5ad --output-rna rna_out.h5ad --output-atac atac_out.h5ad --train-dir ./
 
 ```
