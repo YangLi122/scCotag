@@ -31,10 +31,10 @@ rna_out = sc.read_h5ad('./rna_out.h5ad')
 atac_out = sc.read_h5ad('./atac_out.h5ad')
 
 ## e.g., to calculate the FOSCTTM score
-foscttm(rna_out.obsm['scCotag'], atac.obsm['scCotag'])
+foscttm(rna_out.obsm['scCotag'], atac_out.obsm['scCotag'])
 
 ## or, to vislalize
-combined = ad.concat([rna, atac])
+combined = ad.concat([rna_out, atac_out])
 sc.pp.neighbors(combined, use_rep="scCotag", metric="cosine")
 sc.tl.umap(combined)
 sc.pl.umap(combined, color=["cell_type", "domain"], wspace=0.65)
