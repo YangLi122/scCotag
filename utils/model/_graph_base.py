@@ -17,6 +17,7 @@ EPS = 1e-10
 class GraphConv(torch.nn.Module):
     ## propagation-only.
     ## No learnable parameters.
+    ## Adopted from GLUE
 
     def forward(
         self,
@@ -37,14 +38,6 @@ class GraphConv(torch.nn.Module):
 
 
 class GATv2ConvReducerLayer(GATv2Conv):
-    """
-    GATv2 with optional GLOBAL sigmoid attention (for pruning).
-    When `scale_param` is not None, replaces per-destination softmax with a
-    centered+scaled sigmoid over ALL edges (per-head or all-heads).
-
-    - Works for homogeneous or bipartite inputs (same signature as GATv2Conv).
-    - Stores scores in `self._alpha` (PyG convention) and `self.edge_scores`.
-    """
 
     def __init__(self,
                  in_channels: Union[int, Tuple[int, int]],
@@ -65,11 +58,10 @@ class GATv2ConvReducerLayer(GATv2Conv):
         self.edge_scores: Optional[Tensor] = None  # [E, H]
         self.EPS = 1e-6
 
-    # In modern PyG, attention is computed here:
     def edge_update(self,
                     x_j: torch.Tensor, x_i: torch.Tensor,
                     edge_attr: Optional[torch.Tensor],
-                    index: torch.Tensor,       # row indices (dest nodes)
+                    index: torch.Tensor,     
                     ptr: Optional[torch.Tensor],
                     dim_size: Optional[int]) -> torch.Tensor:
         # --- pre-activation (same as upstream GATv2) ---
@@ -83,47 +75,34 @@ class GATv2ConvReducerLayer(GATv2Conv):
             x = x + edge_attr
 
         x = F.leaky_relu(x, self.negative_slope)
-        logits = (x * self.att).sum(dim=-1)  # [E, H] additive attention
+        logits = (x * self.att).sum(dim=-1) 
 
         if self.scale_param is not None:
-            # --- GLOBAL normalization + sigmoid gating ---
             if self.global_norm == "per_head":
-                # normalize independently for each head
-                mu = logits.mean(dim=0, keepdim=True)                # [1, H]
+                mu = logits.mean(dim=0, keepdim=True)             
                 sigma = logits.std(dim=0, keepdim=True).clamp_min(self.EPS)
-            else:  # "all_heads"
+            else:
                 mu = logits.mean()
                 sigma = logits.std().clamp_min(self.EPS)
 
             normed = (logits - mu) / (sigma / self.scale_param)
-            alpha = torch.sigmoid(normed)                            # [E, H] in (0,1)
+            alpha = torch.sigmoid(normed)                            
         else:
-            # --- fallback to original local attention ---
-            alpha = softmax(logits, index, ptr, dim_size)            # [E, H]
+            alpha = softmax(logits, index, ptr, dim_size)           
 
-        # Keep scores for analysis/pruning (before dropout)
         self.edge_scores = alpha
         self._alpha = alpha
 
-        # Same dropout policy as upstream
         alpha = F.dropout(alpha, p=self.dropout, training=self.training)
         return alpha  # used by message(): out = x_j * alpha.unsqueeze(-1)
 
-    # message() stays as in upstream (x_j * alpha.unsqueeze(-1)); no override needed.
-
-
-# --------- Edge pruning helpers ---------
 
 @torch.no_grad()
 def prune_edges_by_threshold(edge_index: torch.Tensor,
                              alpha: torch.Tensor,
                              tau: float,
                              reduce: Literal["mean", "max"] = "mean") -> Tuple[torch.Tensor, torch.Tensor]:
-    """
-    Keep edges with score >= tau.
-    alpha: [E, H]
-    Returns: (pruned_edge_index, keep_mask[E])
-    """
+
     if alpha.dim() == 2:
         score = alpha.mean(dim=1) if reduce == "mean" else alpha.max(dim=1).values
     else:
@@ -137,10 +116,6 @@ def prune_edges_by_keep_ratio(edge_index: torch.Tensor,
                               alpha: torch.Tensor,
                               keep_ratio: float = 0.5,
                               reduce: Literal["mean", "max"] = "mean") -> Tuple[torch.Tensor, torch.Tensor]:
-    """
-    Keep the top `keep_ratio` fraction of edges globally (batch-wise).
-    alpha: [E, H]
-    """
     if alpha.dim() == 2:
         score = alpha.mean(dim=1) if reduce == "mean" else alpha.max(dim=1).values
     else:
@@ -232,12 +207,8 @@ class GraphAutoEncoder(nn.Module):
 
     @torch.no_grad()
     def set_epoch(self, seed: int):
-        """
-        Resample positives + negatives for this epoch.
-        Stores tensors on self.device for quick use in loss().
-        """
+
         eidx_np, ewt_np = self.gds.propose_shuffle(seed=seed)
-        # self.gds.accept_shuffle((eidx_np, ewt_np))  # not strictly necessary if not using __getitem__
         self._eidx = torch.as_tensor(eidx_np, device=self.device, dtype=torch.long)
         self._ewt  = torch.as_tensor(ewt_np,  device=self.device, dtype=torch.float32)
 
@@ -260,7 +231,6 @@ class GraphAutoEncoder(nn.Module):
     
         mask_g2p = src_is_gene & dst_is_peak
         mask_p2g = src_is_peak & dst_is_gene
-        # mask_self = eidx_src == eidx_dst
         lossw = torch.ones(len(eidx_src)).to(self.device)
         if mask_g2p.any():
             g = eidx_src[mask_g2p]               
@@ -297,10 +267,6 @@ class GraphAutoEncoder(nn.Module):
                         if pos_nll.numel() else per_edge_nll.new_tensor(0.0))
             neg_mean = ((w_neg * neg_nll).sum() / (w_neg.sum().clamp_min(EPS))
                         if neg_nll.numel() else per_edge_nll.new_tensor(0.0))     
-            # n_pos = int(pos_mask.sum().item())
-            # n_neg = int(per_edge_nll.numel() - n_pos)
-            # sums = torch.zeros(2, dtype=per_edge_nll.dtype, device=per_edge_nll.device)
-            # sums.scatter_add_(0, pos_mask, per_edge_nll)
             have_pos = 1 if pos_nll.numel() else 0
             have_neg = 1 if neg_nll.numel() else 0
             avgc = max(have_pos + have_neg, 1)
