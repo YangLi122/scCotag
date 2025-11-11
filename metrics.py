@@ -285,20 +285,31 @@ def nearest_cell_celltype_topk_imbalance(meta_1, meta_2, mod_1, mod_2, topk=1):
     return scores
 
 
+def foscttm_imbalance(x: np.ndarray, y: np.ndarray, rna_shared_cells, atac_shared_cells,**kwargs):
+    x = np.asarray(x)
+    y = np.asarray(y)
 
-# def within_modality_distortion(imbalance_atac_emb, paired_atac_emb, 
-#                                    unique_cell_index, share_cell_index):
-#     dist_gt = cdist(paired_atac_emb[unique_cell_index], paired_atac_emb[share_cell_index])
-#     dist = cdist(imbalance_atac_emb[unique_cell_index], imbalance_atac_emb[share_cell_index])
-#     r = stats.pearsonr(dist.ravel(), dist_gt.ravel()).statistic
-#     distortation = 1 - r
-#     return distortation
+    I = np.asarray(rna_shared_cells, dtype=int)
+    J = np.asarray(atac_shared_cells, dtype=int)
 
+    if I.shape[0] != J.shape[0]:
+        raise ValueError("rna_shared_cells and atac_shared_cells must have the same length.")
+    if I.size == 0:
+        raise ValueError("No shared cells provided.")
+    if (I < 0).any() or (J < 0).any():
+        raise ValueError("Found -1 in indices; ensure you filtered out non-matches before calling.")
+    if (I >= x.shape[0]).any() or (J >= y.shape[0]).any():
+        raise ValueError("Index out of bounds for x or y.")
 
+    d = distance_matrix(x, y, **kwargs)  # shape (n_rna, n_atac)
 
-# def cross_modality_distortion(imbalance_rna_emb, paired_rna_emb, imbalance_atac_emb, paired_atac_emb, rna_cell_index, atac_cell_index):
-#     dist_gt = cdist(paired_atac_emb[atac_cell_index], paired_rna_emb[rna_cell_index])
-#     dist = cdist(imbalance_atac_emb[atac_cell_index], imbalance_rna_emb[rna_cell_index])
-#     r = stats.pearsonr(dist.ravel(), dist_gt.ravel()).statistic
-#     distortation = 1 - r
-#     return distortation
+    true_d_x = d[I, J]                                   
+    fos_x = (d[I, :] < true_d_x[:, None]).mean(axis=1)  
+    score_x = float(fos_x.mean())
+    
+    true_d_y = true_d_x                                  
+    fos_y = (d[:, J] < true_d_y[None, :]).mean(axis=0)  
+    score_y = float(fos_y.mean())
+
+    mean_score = (score_x + score_y) / 2.0
+    return mean_score
