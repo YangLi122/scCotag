@@ -11,7 +11,6 @@ from torch.autograd import Function
 import torch.distributions as D
 
 from .._data import dataset_configuration
-# from .prob import NB, ZINB, EPS
 EPS = 1e-10
 
 def reparameterization_var(mu, var):
@@ -43,8 +42,6 @@ class MLPLayers(nn.Module):
             block.append(nn.Dropout(dropout))
             layers.append(nn.Sequential(*block))
             in_dim = hidden_dims[i]
-            
-        # layers.append(nn.Linear(hidden_dims[-1], out_dim))
 
         self.mlp = nn.Sequential(*layers)
     def forward(self, x):
@@ -74,7 +71,6 @@ class DataEncoder(nn.Module):
         )
         self.mean_encoder = nn.Linear(hidden_dims[-1], out_dim)
         self.std_encoder = nn.Linear(hidden_dims[-1], out_dim)
-        # self.var_activation = torch.exp() 
     def forward(self, x: torch.Tensor):
         q = self.encoder(x)
         q_m = self.mean_encoder(q)
@@ -116,8 +112,7 @@ class DataDecoder(nn.Module):
         logits = (mu + EPS).log() - log_theta
         # logits = -(theta.log() - (mu + EPS).log())         
         return D.NegativeBinomial(total_count=log_theta.exp(), logits=logits)
-        # log_theta = self.log_theta[batch_index]
-        # return D.NegativeBinomial(log_theta.exp(), logits=(mu + EPS).log() - log_theta)
+
 
 
         
