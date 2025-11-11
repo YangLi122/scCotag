@@ -24,6 +24,7 @@ For evaluating purpose, you may use the output .h5ad files which contains cell e
 ```
 from utils.metrics import foscttm
 import scanpy as sc
+import anndata as ad
 rna_out = sc.read_h5ad('./rna_out.h5ad')
 atac_out = sc.read_h5ad('./atac_out.h5ad')
 
