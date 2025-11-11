@@ -210,10 +210,12 @@ class GraphAutoEncoder(nn.Module):
         self.encoder = GraphEncoder(num_nodes, out_channels, self.scale)
         self.decoder = GraphDecoder()
         self.device = device
-
         self.mp_edge_index = graph.edge_index.to(self.device)
         mp_ei_np = self.mp_edge_index.detach().cpu().numpy()
-        mp_enorm_np = normalize_edges(mp_ei_np, np.ones(mp_ei_np.shape[1], dtype=np.float32))
+        if 'ewt' in graph:
+            mp_enorm_np = normalize_edges(mp_ei_np, graph['ewt'].detach().cpu().numpy())
+        else:
+            mp_enorm_np = normalize_edges(mp_ei_np, np.ones(mp_ei_np.shape[1], dtype=np.float32))
         self.mp_edge_norm = torch.from_numpy(mp_enorm_np).to(self.device).float()
         
         self.gds = GraphDataset(
@@ -235,7 +237,7 @@ class GraphAutoEncoder(nn.Module):
         Stores tensors on self.device for quick use in loss().
         """
         eidx_np, ewt_np = self.gds.propose_shuffle(seed=seed)
-        self.gds.accept_shuffle((eidx_np, ewt_np))  # not strictly necessary if not using __getitem__
+        # self.gds.accept_shuffle((eidx_np, ewt_np))  # not strictly necessary if not using __getitem__
         self._eidx = torch.as_tensor(eidx_np, device=self.device, dtype=torch.long)
         self._ewt  = torch.as_tensor(ewt_np,  device=self.device, dtype=torch.float32)
 
@@ -250,9 +252,6 @@ class GraphAutoEncoder(nn.Module):
         pi = pi_feat.clamp_min(0).pow(gamma)
         divisor = (pi * prior).sum(dim=1) / (prior.sum(axis=1) + EPS)
         pi = (pi / divisor.unsqueeze(1)).clamp(min=0, max=1)
-        # pi = pi / (pi.sum(dim=0, keepdim=True) + EPS)
-        # divisor = (pi * prior).sum(axis=1) / (prior.sum(axis=1) + EPS)
-        # pi = np.clip(pi / (divisor[:, None] + EPS), 0.0, 1.0)
         
         src_is_gene   = eidx_src < G
         src_is_peak   = eidx_src >= G
@@ -266,59 +265,16 @@ class GraphAutoEncoder(nn.Module):
         if mask_g2p.any():
             g = eidx_src[mask_g2p]               
             p = eidx_dst[mask_g2p] - G                 
-            w_g2p = pi[g, p]
+            w_g2p = pi[g, p].to(lossw.dtype)
             lossw[mask_g2p] = w_g2p
     
         if mask_p2g.any():
             p = eidx_src[mask_p2g] - G              
             g = eidx_dst[mask_p2g]                     
-            w_p2g = pi[g, p]
+            w_p2g = pi[g, p].to(lossw.dtype)
             lossw[mask_p2g] = w_p2g
         lossw = lossw.clamp_min(0).clamp_max(1)
         return lossw
-        # G, P = pi_feat.shape
-        # prior = prior.detach().cpu().numpy()
-
-        # # --- heavy math in NumPy (CPU) ---
-        # # pi = clamp((pi_feat * prior), 0)**gamma
-        # pi = np.clip(pi_feat * prior, 0.0, None) ** gamma
-    
-        # # divisor = (pi * prior).sum(axis=1) / (prior.sum(axis=1) + EPS)
-        # # pi = clip(pi / (divisor[:, None] + EPS), 0, 1)
-        # EPS = 1e-12  # or whatever you use elsewhere
-        # divisor = (pi * prior).sum(axis=1) / (prior.sum(axis=1) + EPS)
-        # pi = np.clip(pi / (divisor[:, None] + EPS), 0.0, 1.0)
-    
-        # # --- edges/masks: pull just the needed indices to CPU as NumPy ---
-        # pos_mask = (self._ewt > 0)                 # torch.bool mask (likely on GPU)
-        # eidx_pos = self._eidx[:, pos_mask]         # still torch
-        # eidx_src = eidx_pos[0].detach().cpu().numpy()
-        # eidx_dst = eidx_pos[1].detach().cpu().numpy()
-    
-        # # --- build masks in NumPy ---
-        # src_is_gene = eidx_src < G
-        # dst_is_gene = eidx_dst < G
-        # src_is_peak = ~src_is_gene
-        # dst_is_peak = ~dst_is_gene
-    
-        # mask_g2p = src_is_gene & dst_is_peak
-        # mask_p2g = src_is_peak & dst_is_gene
-    
-        # # --- gather weights from pi (NumPy) ---
-        # w = np.ones(eidx_src.shape[0], dtype=np.float32)
-    
-        # if mask_g2p.any():
-        #     g = eidx_src[mask_g2p]
-        #     p = eidx_dst[mask_g2p] - G
-        #     w[mask_g2p] = pi[g, p]
-    
-        # if mask_p2g.any():
-        #     p = eidx_src[mask_p2g] - G
-        #     g = eidx_dst[mask_p2g]
-        #     w[mask_p2g] = pi[g, p]
-    
-        # w = np.clip(w, 0.0, 1.0)
-        # return torch.from_numpy(w).to(self.device)
     
     
     def inference(self, x):
