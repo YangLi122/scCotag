@@ -137,11 +137,10 @@ class scCotag(nn.Module):
         prior['prior_samp'] = self.prior['samp_prior'].detach().cpu().numpy()
         prior['prior_feat'] = self.prior['feat_prior'].detach().cpu().numpy()
         if not self.imbalance:
-            self.pi_samp, self.pi_feat = coot(X, Y, prior, epsilon=self.ot_reg, tol_bcd=3)
+            self.pi_samp, self.pi_feat = coot(X, Y, prior, epsilon=self.ot_reg)
         else:
-            self.pi_samp, self.pi_feat = ucoot(X, Y, prior, epsilon=self.ot_reg, tol_bcd=3)
+            self.pi_samp, self.pi_feat = ucoot(X, Y, prior, epsilon=self.ot_reg)
             
-        # combined_plan = self.pi_samp * 0.25 + self.prior['samp_prior'].detach().cpu().numpy() * 0.75
         self.pi_samp = torch.from_numpy(self.pi_samp).to(self.device).float()
         self.pi_feat = torch.from_numpy(self.pi_feat).to(self.device).float()
         
@@ -158,22 +157,7 @@ class scCotag(nn.Module):
         return {"rna_inference_res": rna_inference_res, "atac_inference_res": atac_inference_res, 
                 "feature_inference_res": feature_inference_res}
 
-    # def transportation_plan_update(self):
-    #     rnaEmb = self.rnaEmb
-    #     atacEmb = self.atacEmb
-    #     geneEmb = self.geneEmb
-    #     peakEmb = self.peakEmb
-        
-    #     torch.autograd.set_grad_enabled(False)
-    #     self.pi_samp, self.pi_feat = ucoot_emb(rnaEmb, atacEmb, geneEmb, peakEmb, self.prior, epsilon=0.05, tol_bcd=10)
-    #     torch.autograd.set_grad_enabled(True)
-    #     self.prior['samp_prior'] = self.pi_samp
-    #     self.prior['feat_prior'] = self.pi_feat
-
     def samp_alignment_loss(self, warmup_epochs, anchor: Literal["none", "rna", "atac"] = "rna", gamma=2):
-        ## Imbalance Testing 
-
-        # alignable = list(set(self.rna.obs_names).intersection(set(self.atac.obs_names)))
         
         if anchor == 'rna':
             z_r, z_a = self.rnaEmb.detach(), self.atacEmb
@@ -288,13 +272,9 @@ class scCotag(nn.Module):
 
         
     def distribution_alignment_loss(self):
-        # if not self.imbalance: 
         mixing_module = SamplesLoss(
             loss="sinkhorn", p=2, scaling=0.9, blur = 0.01, backend="tensorized")
-        # else:
-        #     mixing_module = SamplesLoss(
-        #     loss="sinkhorn", p=2, scaling=0.9, blur = 0.01, reach=0.5, backend="tensorized")
-        
+
         cost = mixing_module(self.rnaEmb, self.atacEmb)
         cost = torch.clamp_min(cost, 0.0) 
         return cost
@@ -308,12 +288,14 @@ class scCotag(nn.Module):
         graph_vae_loss = self.graphAE.loss(inference_res['feature_inference_res'], self.epoch, self.pi_feat, self.prior['feat_prior'], self.graph_reweighting)
         atac_scalar = self.rna.layers['counts'].mean() / self.atac.layers['counts'].mean()
 
-        # self.transportation_plan_update()
-        if self.epoch > warmup_epochs:
+        if self.epoch > warmup_epochs and self.samp_alignment_loss != 0:
             samp_align_loss = self.samp_alignment_loss(warmup_epochs)
-            distribution_align_loss = self.distribution_alignment_loss()
         else:
             samp_align_loss = torch.zeros((), device=self.device)
+        
+        if self.epoch > warmup_epochs and self.distribution_alignment_weight != 0:
+            distribution_align_loss = self.distribution_alignment_loss()
+        else:
             distribution_align_loss = torch.zeros((), device=self.device)
         rna_vae_loss_wt = self.rna_vae_weight  * rna_vae_loss['loss']
         atac_vae_loss_wt = self.atac_vae_weight  * atac_vae_loss['loss'] * atac_scalar
@@ -368,10 +350,6 @@ class scCotag(nn.Module):
             # torch.autograd.set_detect_anomaly(True)
             loss['loss'].backward()
             optimizer.step()
-            # scheduler.step()
-            # if epoch % 10 == 0 and epoch != 0:
-            #     attention_map, df = self.graphAE.encoder.edge_pruning(threshold=0.2)
-            #     self.graph['edge_index'] = attention_map
 
         print("Training Ends...")
 
