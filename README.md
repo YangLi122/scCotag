@@ -23,6 +23,7 @@ python Run_scCotag.py --input-rna 10x-Multiome-Pbmc-Subsampled_100perCT-RNA.h5ad
 For evaluating purpose, you may use the output .h5ad files which contains cell embeddings and feature embeddings:
 ```
 from utils.metrics import foscttm
+import scanpy as sc
 rna_out = sc.read_h5ad('./rna_out.h5ad')
 atac_out = sc.read_h5ad('./atac_out.h5ad')
 
