@@ -19,3 +19,19 @@ micromamba activate sccoatg
 python Run_scCotag.py --input-rna 10x-Multiome-Pbmc-Subsampled_100perCT-RNA.h5ad --input-atac 10x-Multiome-Pbmc-Subsampled_100perCT-ATAC.h5ad --output-rna rna_out.h5ad --output-atac atac_out.h5ad --train-dir ./
 
 ```
+
+For evaluating purpose, you may use the output .h5ad files which contains cell embeddings and feature embeddings:
+```
+from utils.metrics import foscttm
+rna_out = sc.read_h5ad('./rna_out.h5ad')
+atac_out = sc.read_h5ad('./atac_out.h5ad')
+
+## e.g., to calculate the FOSCTTM score
+foscttm(rna_out.obsm['scCotag'], atac.obsm['scCotag'])
+
+## or, to vislalize
+combined = ad.concat([rna, atac])
+sc.pp.neighbors(combined, use_rep="scCotag", metric="cosine")
+sc.tl.umap(combined)
+sc.pl.umap(combined, color=["cell_type", "domain"], wspace=0.65)
+```
