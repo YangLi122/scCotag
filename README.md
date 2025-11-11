@@ -3,6 +3,8 @@ scCotag: Diagonal integration of single-cell multi-omics data via prior-informed
 
 Installation:
 ```
+git clone https://github.com/YangLi122/scCotag.git
+cd scCotag
 micromamba create -n sccotag -f environment.yml python=3.12
 ```
 
