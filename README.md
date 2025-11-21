@@ -15,7 +15,7 @@ https://drive.google.com/file/d/1TRErY-7m1bKF5eak8g1VE0VFnFwd5HuN/view?usp=shari
 https://drive.google.com/file/d/1MxpLn7E9Tw8dWgse08y2j1VpPetSuHm7/view?usp=sharing
 ```
 
-To run the model:
+To run the model (replacing the input and output data path if needed):
 ```
 micromamba activate sccotag
 python Run_scCotag.py --input-rna 10x-Multiome-Pbmc-Subsampled_100perCT-RNA.h5ad --input-atac 10x-Multiome-Pbmc-Subsampled_100perCT-ATAC.h5ad --output-rna rna_out.h5ad --output-atac atac_out.h5ad --train-dir ./
